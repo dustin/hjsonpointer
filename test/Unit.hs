@@ -4,9 +4,9 @@
 module Main where
 
 import           Data.Aeson
+import qualified Data.Aeson.Key         as J
 import           Data.Bifunctor         (first)
 import           Data.Foldable
-import           Data.Monoid
 import           Data.Text              (Text)
 import qualified Data.Text              as T
 import           Data.Text.Encoding     (decodeUtf8, encodeUtf8)
@@ -22,7 +22,7 @@ import qualified Example
 deriving instance Arbitrary JP.Pointer
 
 instance Arbitrary JP.Token where
-    arbitrary = JP.Token . T.pack <$> arbitrary
+    arbitrary = JP.Token . J.fromText . T.pack <$> arbitrary
 
 main :: IO ()
 main = hspec $ do

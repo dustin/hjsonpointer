@@ -5,10 +5,10 @@
 module JSONPointer where
 
 import           Control.Monad       (when)
-import           Data.Aeson
+import           Data.Aeson          as J
+import           Data.Aeson.Key      as J
+import qualified Data.Aeson.KeyMap   as KM
 import qualified Data.Hashable       as HA
-import qualified Data.HashMap.Strict as HM
-import           Data.Semigroup      (Semigroup)
 import           Data.Text           (Text)
 import qualified Data.Text           as T
 import qualified Data.Vector         as V
@@ -57,7 +57,7 @@ instance ToJSON Pointer where
 -- (e.g. if you're referencing a key such as @"abc/123"@, go ahead
 -- and write that exactly.
 newtype Token
-    = Token { _unToken :: Text }
+    = Token { _unToken :: J.Key }
     deriving (Eq, Show, Generic)
 
 instance HA.Hashable Token
@@ -70,7 +70,7 @@ escape (Pointer []) = ""
 escape (Pointer ts) =
       T.cons '/'
     . T.intercalate "/"
-    . fmap (T.replace "/" "~1" . T.replace "~" "~0" . _unToken)
+    . fmap (T.replace "/" "~1" . T.replace "~" "~0" . J.toText . _unToken)
     $ ts
 
 data FormatError
@@ -119,7 +119,7 @@ newtype Key
     = Key { _unKey :: Text }
     deriving (Eq, Show, Generic)
 
-instance HA.Hashable Key
+instance HA.Hashable JSONPointer.Key
 
 -- | A glorified @type@ alias. If you need to do JSON Pointer operations
 -- you're looking for 'Token' instead.
@@ -137,7 +137,7 @@ instance HA.Hashable Index
 unescapeToken :: Text -> Maybe Token
 unescapeToken t
     | not (isValid t) = Nothing
-    | otherwise       = Just . Token . replace $ t
+    | otherwise       = Just . Token . J.fromText . replace $ t
   where
     -- All tildes must be followed by 0s or 1s.
     isValid :: Text -> Bool
@@ -155,7 +155,7 @@ unescapeToken t
 -- want to resolve an entire pointer at once.
 resolveToken :: Token -> Value -> Either ResolutionError Value
 resolveToken tok (Array vs) =
-    case readMaybe . T.unpack . _unToken $ tok of
+    case readMaybe . T.unpack . J.toText .  _unToken $ tok of
         Nothing -> Left ArrayIndexInvalid
         Just n  -> do
             when (n < 0) (Left ArrayIndexInvalid)
@@ -163,7 +163,7 @@ resolveToken tok (Array vs) =
                 Nothing  -> Left ArrayElemNotFound
                 Just res -> Right res
 resolveToken tok (Object h) =
-    case HM.lookup (_unToken tok) h of
+    case KM.lookup (_unToken tok) h of
         Nothing  -> Left ObjectLookupFailed
         Just res -> Right res
 resolveToken _ _ = Left ExpectedObjectOrArray
